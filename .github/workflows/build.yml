@@ -1,54 +1,38 @@
-name: Build APK
+name: Build Vibe Music APK
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
-      - name: Setup project structure
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
         run: |
-          mkdir -p app/src/main/java/com/vibemusic
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/drawable
-          mkdir -p gradle/wrapper
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-          cp AndroidManifest.xml app/src/main/AndroidManifest.xml
-          cp MainActivity.java app/src/main/java/com/vibemusic/
-          cp PlayerActivity.java app/src/main/java/com/vibemusic/
-          cp MusicService.java app/src/main/java/com/vibemusic/
-          cp SongAdapter.java app/src/main/java/com/vibemusic/
-          cp YouTubeExtractor.java app/src/main/java/com/vibemusic/
-          cp Song.java app/src/main/java/com/vibemusic/
-          cp activity_main.xml app/src/main/res/layout/
-          cp activity_player.xml app/src/main/res/layout/
-          cp item_song.xml app/src/main/res/layout/
-          cp colors.xml app/src/main/res/values/
-          cp strings.xml app/src/main/res/values/
-          cp themes.xml app/src/main/res/values/
-          cp search_bg.xml app/src/main/res/drawable/
-          cp play_button_bg.xml app/src/main/res/drawable/
-          cp ic_launcher.xml app/src/main/res/drawable/
-          cp gradle-wrapper.properties gradle/wrapper/
-          cp build.gradle app/build.gradle
+      - name: Create full project structure
+        run: |
+          mkdir -p project/app/src/main/java/com/vibemusic
+          mkdir -p project/app/src/main/res/layout
+          mkdir -p project/app/src/main/res/values
+          mkdir -p project/app/src/main/res/drawable
+          mkdir -p project/gradle/wrapper
 
-          # Fix root build.gradle
-          cat > build.gradle << 'EOF'
-          plugins {
-              id 'com.android.application' version '8.3.0' apply false
-          }
-          EOF
-
-          # Fix settings.gradle
-          cat > settings.gradle << 'EOF'
+      - name: Write settings.gradle
+        run: |
+          cat > project/settings.gradle << 'SETTINGS'
           pluginManagement {
               repositories {
                   google()
@@ -65,22 +49,630 @@ jobs:
           }
           rootProject.name = "VibeMusic"
           include ':app'
-          EOF
+          SETTINGS
 
-      - name: Download Gradle Wrapper JAR
+      - name: Write root build.gradle
         run: |
-          curl -L "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar
+          cat > project/build.gradle << 'ROOT'
+          plugins {
+              id 'com.android.application' version '8.3.0' apply false
+          }
+          ROOT
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Write gradle.properties
+        run: |
+          cat > project/gradle.properties << 'PROPS'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          android.enableJetifier=true
+          PROPS
+
+      - name: Write gradle wrapper properties
+        run: |
+          cat > project/gradle/wrapper/gradle-wrapper.properties << 'WRAPPER'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.6-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          WRAPPER
+
+      - name: Download gradle wrapper jar
+        run: |
+          curl -sL "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
+            -o project/gradle/wrapper/gradle-wrapper.jar
+
+      - name: Write gradlew
+        run: |
+          cat > project/gradlew << 'GRADLEW'
+          #!/bin/sh
+          APP_HOME=$(cd "$(dirname "$0")" && pwd)
+          exec java -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+            org.gradle.wrapper.GradleWrapperMain "$@"
+          GRADLEW
+          chmod +x project/gradlew
+
+      - name: Write app build.gradle
+        run: |
+          cat > project/app/build.gradle << 'APPBUILD'
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.vibemusic'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.vibemusic"
+                  minSdk 26
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  debug {}
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.11.0'
+              implementation 'androidx.recyclerview:recyclerview:1.3.2'
+              implementation 'androidx.media3:media3-exoplayer:1.3.0'
+              implementation 'androidx.media3:media3-ui:1.3.0'
+              implementation 'com.github.bumptech.glide:glide:4.16.0'
+          }
+          APPBUILD
+
+      - name: Write AndroidManifest
+        run: |
+          cat > project/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <application
+                  android:allowBackup="true"
+                  android:label="Vibe Music"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <activity android:name=".PlayerActivity" android:exported="false" />
+                  <service
+                      android:name=".MusicService"
+                      android:exported="false"
+                      android:foregroundServiceType="mediaPlayback" />
+              </application>
+          </manifest>
+          MANIFEST
+
+      - name: Write Song.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/Song.java << 'SONG'
+          package com.vibemusic;
+          public class Song {
+              public String id, title, artist, thumbnailUrl, duration;
+              public long durationMs;
+              public Song(String id, String title, String artist, String thumbnailUrl, String duration, long durationMs) {
+                  this.id = id; this.title = title; this.artist = artist;
+                  this.thumbnailUrl = thumbnailUrl; this.duration = duration; this.durationMs = durationMs;
+              }
+          }
+          SONG
+
+      - name: Write YouTubeExtractor.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/YouTubeExtractor.java << 'YT'
+          package com.vibemusic;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.util.Log;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          import java.io.*;
+          import java.net.*;
+          import java.util.*;
+          import java.util.concurrent.*;
+          public class YouTubeExtractor {
+              private static final String TAG = "YTExtractor";
+              private final ExecutorService executor = Executors.newCachedThreadPool();
+              private final Handler mainHandler = new Handler(Looper.getMainLooper());
+              public interface SearchCallback { void onResults(List<Song> s); void onError(String e); }
+              public interface StreamCallback { void onStream(String url); void onError(String e); }
+              public void search(String query, SearchCallback cb) {
+                  executor.execute(() -> {
+                      try {
+                          String enc = URLEncoder.encode(query + " music", "UTF-8");
+                          String html = fetch("https://www.youtube.com/results?search_query=" + enc + "&sp=EgIQAQ%3D%3D");
+                          List<Song> results = parse(html);
+                          mainHandler.post(() -> cb.onResults(results));
+                      } catch (Exception e) { mainHandler.post(() -> cb.onError(e.getMessage())); }
+                  });
+              }
+              public void getStreamUrl(String videoId, StreamCallback cb) {
+                  executor.execute(() -> {
+                      try {
+                          String url = extractStream(videoId);
+                          if (url != null) mainHandler.post(() -> cb.onStream(url));
+                          else mainHandler.post(() -> cb.onError("No stream found"));
+                      } catch (Exception e) { mainHandler.post(() -> cb.onError(e.getMessage())); }
+                  });
+              }
+              private List<Song> parse(String html) {
+                  List<Song> songs = new ArrayList<>();
+                  try {
+                      String marker = "var ytInitialData = ";
+                      int s = html.indexOf(marker); if (s == -1) return songs;
+                      int js = s + marker.length(), bc = 0, je = js;
+                      for (int i = js; i < Math.min(js+500000, html.length()); i++) {
+                          char c = html.charAt(i);
+                          if (c == '{') bc++; else if (c == '}' && --bc == 0) { je = i+1; break; }
+                      }
+                      JSONObject json = new JSONObject(html.substring(js, je));
+                      JSONArray contents = json.getJSONObject("contents").getJSONObject("twoColumnSearchResultsRenderer")
+                          .getJSONObject("primaryContents").getJSONObject("sectionListRenderer").getJSONArray("contents");
+                      for (int i = 0; i < contents.length() && songs.size() < 20; i++) {
+                          try {
+                              JSONObject sec = contents.getJSONObject(i);
+                              if (!sec.has("itemSectionRenderer")) continue;
+                              JSONArray items = sec.getJSONObject("itemSectionRenderer").getJSONArray("contents");
+                              for (int j = 0; j < items.length() && songs.size() < 20; j++) {
+                                  try {
+                                      JSONObject item = items.getJSONObject(j);
+                                      if (!item.has("videoRenderer")) continue;
+                                      JSONObject v = item.getJSONObject("videoRenderer");
+                                      String id = v.getString("videoId");
+                                      String title = v.getJSONObject("title").getJSONArray("runs").getJSONObject(0).getString("text");
+                                      String ch = v.getJSONObject("ownerText").getJSONArray("runs").getJSONObject(0).getString("text");
+                                      JSONArray th = v.getJSONObject("thumbnail").getJSONArray("thumbnails");
+                                      String thumb = th.getJSONObject(th.length()>1?1:0).getString("url");
+                                      String dur = v.has("lengthText") ? v.getJSONObject("lengthText").getString("simpleText") : "0:00";
+                                      songs.add(new Song(id, title, ch, thumb, dur, parseDur(dur)));
+                                  } catch (Exception ignored) {}
+                              }
+                          } catch (Exception ignored) {}
+                      }
+                  } catch (Exception e) { Log.e(TAG, "parse: " + e.getMessage()); }
+                  return songs;
+              }
+              private String extractStream(String videoId) throws Exception {
+                  String html = fetch("https://www.youtube.com/watch?v=" + videoId);
+                  String marker = "ytInitialPlayerResponse = ";
+                  int s = html.indexOf(marker); if (s == -1) return null;
+                  int js = s + marker.length(), bc = 0, je = js;
+                  for (int i = js; i < Math.min(js+200000, html.length()); i++) {
+                      char c = html.charAt(i);
+                      if (c == '{') bc++; else if (c == '}' && --bc == 0) { je = i+1; break; }
+                  }
+                  JSONObject player = new JSONObject(html.substring(js, je));
+                  JSONObject sd = player.optJSONObject("streamingData"); if (sd == null) return null;
+                  JSONArray formats = sd.optJSONArray("adaptiveFormats"); if (formats == null) return null;
+                  String best = null; int bestBr = 0;
+                  for (int i = 0; i < formats.length(); i++) {
+                      JSONObject f = formats.getJSONObject(i);
+                      if (!f.optString("mimeType","").startsWith("audio/")) continue;
+                      int br = f.optInt("averageBitrate", f.optInt("bitrate", 0));
+                      if (br > bestBr) { String u = f.optString("url",""); if (!u.isEmpty()) { best = u; bestBr = br; } }
+                  }
+                  return best;
+              }
+              private String fetch(String urlStr) throws Exception {
+                  HttpURLConnection c = (HttpURLConnection) new URL(urlStr).openConnection();
+                  c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36");
+                  c.setConnectTimeout(15000); c.setReadTimeout(15000);
+                  StringBuilder sb = new StringBuilder();
+                  try (BufferedReader br = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
+                      String line; while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                  }
+                  return sb.toString();
+              }
+              private long parseDur(String d) {
+                  try {
+                      String[] p = d.split(":");
+                      if (p.length == 3) return (Long.parseLong(p[0])*3600+Long.parseLong(p[1])*60+Long.parseLong(p[2]))*1000;
+                      if (p.length == 2) return (Long.parseLong(p[0])*60+Long.parseLong(p[1]))*1000;
+                  } catch (Exception ignored) {}
+                  return 0;
+              }
+          }
+          YT
+
+      - name: Write MusicService.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/MusicService.java << 'SVC'
+          package com.vibemusic;
+          import android.app.*;
+          import android.content.Intent;
+          import android.os.*;
+          import androidx.annotation.Nullable;
+          import androidx.core.app.NotificationCompat;
+          import androidx.media3.common.MediaItem;
+          import androidx.media3.common.Player;
+          import androidx.media3.exoplayer.ExoPlayer;
+          public class MusicService extends Service {
+              private static final String CH = "vibe_ch";
+              private static final int NID = 1;
+              private ExoPlayer player;
+              private Song currentSong;
+              private final IBinder binder = new MusicBinder();
+              public class MusicBinder extends Binder { public MusicService getService() { return MusicService.this; } }
+              @Override public void onCreate() {
+                  super.onCreate();
+                  NotificationChannel ch = new NotificationChannel(CH, "Vibe Music", NotificationManager.IMPORTANCE_LOW);
+                  getSystemService(NotificationManager.class).createNotificationChannel(ch);
+                  player = new ExoPlayer.Builder(this).build();
+                  player.addListener(new Player.Listener() {
+                      @Override public void onPlaybackStateChanged(int s) {
+                          if (s == Player.STATE_ENDED) sendBroadcast(new Intent("com.vibemusic.ENDED"));
+                      }
+                  });
+              }
+              @Nullable @Override public IBinder onBind(Intent i) { return binder; }
+              @Override public int onStartCommand(Intent i, int f, int id) { return START_STICKY; }
+              public void playSong(Song s, String url) {
+                  currentSong = s;
+                  player.setMediaItem(MediaItem.fromUri(url));
+                  player.prepare(); player.play();
+                  startForeground(NID, buildNotif());
+              }
+              public void togglePlayPause() { if (player.isPlaying()) player.pause(); else player.play(); }
+              public void seekTo(long ms) { player.seekTo(ms); }
+              public boolean isPlaying() { return player.isPlaying(); }
+              public long getPosition() { return player.getCurrentPosition(); }
+              public long getDuration() { return player.getDuration(); }
+              public Song getCurrentSong() { return currentSong; }
+              private Notification buildNotif() {
+                  Intent i = new Intent(this, MainActivity.class);
+                  PendingIntent pi = PendingIntent.getActivity(this, 0, i, PendingIntent.FLAG_IMMUTABLE);
+                  return new NotificationCompat.Builder(this, CH)
+                      .setContentTitle(currentSong != null ? currentSong.title : "Vibe Music")
+                      .setContentText(currentSong != null ? currentSong.artist : "")
+                      .setSmallIcon(android.R.drawable.ic_media_play)
+                      .setContentIntent(pi).setOngoing(true).build();
+              }
+              @Override public void onDestroy() { player.release(); super.onDestroy(); }
+          }
+          SVC
+
+      - name: Write SongAdapter.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/SongAdapter.java << 'ADAPT'
+          package com.vibemusic;
+          import android.view.*;
+          import android.widget.*;
+          import androidx.annotation.NonNull;
+          import androidx.recyclerview.widget.RecyclerView;
+          import com.bumptech.glide.Glide;
+          import java.util.List;
+          public class SongAdapter extends RecyclerView.Adapter<SongAdapter.VH> {
+              public interface OnClick { void onClick(Song s, int pos); }
+              private List<Song> songs;
+              private final OnClick listener;
+              public SongAdapter(List<Song> songs, OnClick l) { this.songs = songs; this.listener = l; }
+              public void update(List<Song> s) { this.songs = s; notifyDataSetChanged(); }
+              @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
+                  return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_song, p, false));
+              }
+              @Override public void onBindViewHolder(@NonNull VH h, int pos) {
+                  Song s = songs.get(pos);
+                  h.title.setText(s.title); h.artist.setText(s.artist); h.dur.setText(s.duration);
+                  Glide.with(h.thumb).load(s.thumbnailUrl).centerCrop().into(h.thumb);
+                  h.itemView.setOnClickListener(v -> listener.onClick(s, pos));
+              }
+              @Override public int getItemCount() { return songs != null ? songs.size() : 0; }
+              static class VH extends RecyclerView.ViewHolder {
+                  ImageView thumb; TextView title, artist, dur;
+                  VH(View v) { super(v); thumb=v.findViewById(R.id.iv_thumb); title=v.findViewById(R.id.tv_title); artist=v.findViewById(R.id.tv_artist); dur=v.findViewById(R.id.tv_duration); }
+              }
+          }
+          ADAPT
+
+      - name: Write MainActivity.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/MainActivity.java << 'MAIN'
+          package com.vibemusic;
+          import android.content.*;
+          import android.os.*;
+          import android.view.*;
+          import android.view.inputmethod.*;
+          import android.widget.*;
+          import androidx.appcompat.app.AppCompatActivity;
+          import androidx.recyclerview.widget.*;
+          import com.bumptech.glide.Glide;
+          import java.util.*;
+          public class MainActivity extends AppCompatActivity {
+              private EditText etSearch;
+              private ProgressBar progressSearch;
+              private RecyclerView rvSongs;
+              private LinearLayout miniPlayer;
+              private ImageView ivMiniThumb;
+              private TextView tvMiniTitle, tvMiniArtist, tvEmpty;
+              private ImageButton btnMiniPlay;
+              private ProgressBar progressMini;
+              private SongAdapter adapter;
+              private List<Song> songs = new ArrayList<>();
+              private YouTubeExtractor extractor = new YouTubeExtractor();
+              private MusicService service;
+              private boolean bound = false;
+              private Handler handler = new Handler(Looper.getMainLooper());
+              private Runnable progressUpdater = new Runnable() {
+                  public void run() {
+                      if (bound && service != null) {
+                          long dur = service.getDuration(), pos = service.getPosition();
+                          if (dur > 0) progressMini.setProgress((int)(pos*100/dur));
+                          handler.postDelayed(this, 500);
+                      }
+                  }
+              };
+              private ServiceConnection conn = new ServiceConnection() {
+                  public void onServiceConnected(ComponentName n, IBinder b) {
+                      service = ((MusicService.MusicBinder)b).getService(); bound = true; updateMini();
+                  }
+                  public void onServiceDisconnected(ComponentName n) { bound = false; }
+              };
+              private BroadcastReceiver endedRcv = new BroadcastReceiver() {
+                  public void onReceive(Context c, Intent i) { btnMiniPlay.setImageResource(android.R.drawable.ic_media_play); }
+              };
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  setContentView(R.layout.activity_main);
+                  etSearch = findViewById(R.id.et_search);
+                  progressSearch = findViewById(R.id.progress_search);
+                  rvSongs = findViewById(R.id.rv_songs);
+                  miniPlayer = findViewById(R.id.mini_player);
+                  ivMiniThumb = findViewById(R.id.iv_mini_thumb);
+                  tvMiniTitle = findViewById(R.id.tv_mini_title);
+                  tvMiniArtist = findViewById(R.id.tv_mini_artist);
+                  btnMiniPlay = findViewById(R.id.btn_mini_play_pause);
+                  progressMini = findViewById(R.id.progress_mini);
+                  tvEmpty = findViewById(R.id.tv_empty_state);
+                  adapter = new SongAdapter(songs, this::onSongClick);
+                  rvSongs.setLayoutManager(new LinearLayoutManager(this));
+                  rvSongs.setAdapter(adapter);
+                  etSearch.setOnEditorActionListener((v, id, ev) -> { if (id == EditorInfo.IME_ACTION_SEARCH) { doSearch(); return true; } return false; });
+                  findViewById(R.id.btn_search).setOnClickListener(v -> doSearch());
+                  btnMiniPlay.setOnClickListener(v -> { if (bound) { service.togglePlayPause(); updateMini(); } });
+                  miniPlayer.setOnClickListener(v -> { if (bound && service != null && service.getCurrentSong() != null) startActivity(new Intent(this, PlayerActivity.class)); });
+                  startService(new Intent(this, MusicService.class));
+                  bindService(new Intent(this, MusicService.class), conn, BIND_AUTO_CREATE);
+                  registerReceiver(endedRcv, new IntentFilter("com.vibemusic.ENDED"), RECEIVER_NOT_EXPORTED);
+              }
+              private void doSearch() {
+                  String q = etSearch.getText().toString().trim();
+                  if (q.isEmpty()) return;
+                  ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(etSearch.getWindowToken(), 0);
+                  progressSearch.setVisibility(View.VISIBLE);
+                  tvEmpty.setVisibility(View.GONE);
+                  songs.clear(); adapter.update(songs);
+                  extractor.search(q, new YouTubeExtractor.SearchCallback() {
+                      public void onResults(List<Song> r) { progressSearch.setVisibility(View.GONE); if (r.isEmpty()) { tvEmpty.setVisibility(View.VISIBLE); } else { songs.addAll(r); adapter.update(songs); } }
+                      public void onError(String e) { progressSearch.setVisibility(View.GONE); tvEmpty.setVisibility(View.VISIBLE); Toast.makeText(MainActivity.this, "Error: "+e, Toast.LENGTH_SHORT).show(); }
+                  });
+              }
+              private void onSongClick(Song s, int pos) {
+                  Toast.makeText(this, "Loading...", Toast.LENGTH_SHORT).show();
+                  extractor.getStreamUrl(s.id, new YouTubeExtractor.StreamCallback() {
+                      public void onStream(String url) { if (bound) { service.playSong(s, url); updateMini(); handler.post(progressUpdater); startActivity(new Intent(MainActivity.this, PlayerActivity.class)); } }
+                      public void onError(String e) { Toast.makeText(MainActivity.this, "Error: "+e, Toast.LENGTH_SHORT).show(); }
+                  });
+              }
+              private void updateMini() {
+                  if (!bound || service == null || service.getCurrentSong() == null) return;
+                  Song s = service.getCurrentSong();
+                  miniPlayer.setVisibility(View.VISIBLE);
+                  tvMiniTitle.setText(s.title); tvMiniArtist.setText(s.artist);
+                  btnMiniPlay.setImageResource(service.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+                  Glide.with(this).load(s.thumbnailUrl).into(ivMiniThumb);
+              }
+              @Override protected void onDestroy() { handler.removeCallbacks(progressUpdater); unregisterReceiver(endedRcv); if (bound) unbindService(conn); super.onDestroy(); }
+          }
+          MAIN
+
+      - name: Write PlayerActivity.java
+        run: |
+          cat > project/app/src/main/java/com/vibemusic/PlayerActivity.java << 'PLAYER'
+          package com.vibemusic;
+          import android.content.*;
+          import android.os.*;
+          import android.widget.*;
+          import androidx.appcompat.app.AppCompatActivity;
+          import com.bumptech.glide.Glide;
+          import java.util.*;
+          import java.util.concurrent.TimeUnit;
+          public class PlayerActivity extends AppCompatActivity {
+              private ImageView ivArt;
+              private TextView tvTitle, tvArtist, tvCur, tvTotal;
+              private SeekBar seekBar;
+              private ImageButton btnPlay, btnBack;
+              private MusicService service;
+              private boolean bound = false;
+              private Handler handler = new Handler(Looper.getMainLooper());
+              private Runnable updater = new Runnable() {
+                  public void run() {
+                      if (bound && service != null) {
+                          long dur = service.getDuration(), pos = service.getPosition();
+                          if (dur > 0) { seekBar.setMax((int)dur); seekBar.setProgress((int)pos); tvCur.setText(fmt(pos)); tvTotal.setText(fmt(dur)); }
+                          updateBtn();
+                      }
+                      handler.postDelayed(this, 500);
+                  }
+              };
+              private ServiceConnection conn = new ServiceConnection() {
+                  public void onServiceConnected(ComponentName n, IBinder b) { service = ((MusicService.MusicBinder)b).getService(); bound = true; updateUI(); handler.post(updater); }
+                  public void onServiceDisconnected(ComponentName n) { bound = false; }
+              };
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  setContentView(R.layout.activity_player);
+                  ivArt = findViewById(R.id.iv_album_art);
+                  tvTitle = findViewById(R.id.tv_title); tvArtist = findViewById(R.id.tv_artist);
+                  tvCur = findViewById(R.id.tv_current_time); tvTotal = findViewById(R.id.tv_total_time);
+                  seekBar = findViewById(R.id.seek_bar);
+                  btnPlay = findViewById(R.id.btn_play_pause);
+                  btnBack = findViewById(R.id.btn_back);
+                  btnBack.setOnClickListener(v -> finish());
+                  btnPlay.setOnClickListener(v -> { if (bound) { service.togglePlayPause(); updateBtn(); } });
+                  seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      public void onProgressChanged(SeekBar s, int p, boolean user) { if (user && bound) service.seekTo(p); }
+                      public void onStartTrackingTouch(SeekBar s) {} public void onStopTrackingTouch(SeekBar s) {}
+                  });
+                  bindService(new Intent(this, MusicService.class), conn, BIND_AUTO_CREATE);
+              }
+              private void updateUI() {
+                  if (!bound || service == null || service.getCurrentSong() == null) return;
+                  Song s = service.getCurrentSong();
+                  tvTitle.setText(s.title); tvArtist.setText(s.artist);
+                  Glide.with(this).load(s.thumbnailUrl).into(ivArt);
+                  updateBtn();
+              }
+              private void updateBtn() { if (bound && service != null) btnPlay.setImageResource(service.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play); }
+              private String fmt(long ms) { return String.format(Locale.US, "%d:%02d", TimeUnit.MILLISECONDS.toMinutes(ms), TimeUnit.MILLISECONDS.toSeconds(ms)%60); }
+              @Override protected void onDestroy() { handler.removeCallbacks(updater); if (bound) unbindService(conn); super.onDestroy(); }
+          }
+          PLAYER
+
+      - name: Write layouts
+        run: |
+          cat > project/app/src/main/res/layout/activity_main.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:background="#0F0F0F">
+              <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:text="Vibe Music" android:textColor="#FFFFFF" android:textSize="22sp"
+                  android:textStyle="bold" android:padding="20dp"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:orientation="horizontal" android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingBottom="12dp">
+                  <EditText android:id="@+id/et_search" android:layout_width="0dp" android:layout_height="48dp"
+                      android:layout_weight="1" android:hint="Search songs..." android:textColor="#FFFFFF"
+                      android:background="#242424" android:paddingLeft="12dp" android:paddingRight="12dp"
+                      android:imeOptions="actionSearch" android:inputType="text" android:singleLine="true"/>
+                  <Button android:id="@+id/btn_search" android:layout_width="wrap_content" android:layout_height="48dp"
+                      android:layout_marginLeft="8dp" android:text="Search" android:textColor="#000000" android:backgroundTint="#1DB954"/>
+              </LinearLayout>
+              <ProgressBar android:id="@+id/progress_search" android:layout_width="wrap_content"
+                  android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:visibility="gone"/>
+              <TextView android:id="@+id/tv_empty_state" android:layout_width="match_parent"
+                  android:layout_height="wrap_content" android:text="Search for music above"
+                  android:textColor="#888888" android:gravity="center" android:padding="32dp"/>
+              <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_songs"
+                  android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+              <LinearLayout android:id="@+id/mini_player" android:layout_width="match_parent"
+                  android:layout_height="72dp" android:orientation="horizontal" android:background="#1A1A1A"
+                  android:gravity="center_vertical" android:paddingLeft="12dp" android:paddingRight="12dp" android:visibility="gone">
+                  <ImageView android:id="@+id/iv_mini_thumb" android:layout_width="48dp" android:layout_height="48dp" android:scaleType="centerCrop"/>
+                  <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                      android:orientation="vertical" android:paddingLeft="12dp" android:paddingRight="12dp">
+                      <TextView android:id="@+id/tv_mini_title" android:layout_width="match_parent"
+                          android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="14sp"
+                          android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+                      <TextView android:id="@+id/tv_mini_artist" android:layout_width="match_parent"
+                          android:layout_height="wrap_content" android:textColor="#AAAAAA" android:textSize="12sp" android:maxLines="1"/>
+                      <ProgressBar android:id="@+id/progress_mini" style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                          android:layout_width="match_parent" android:layout_height="2dp" android:progressTint="#1DB954" android:max="100"/>
+                  </LinearLayout>
+                  <ImageButton android:id="@+id/btn_mini_play_pause" android:layout_width="44dp" android:layout_height="44dp"
+                      android:src="@android:drawable/ic_media_play" android:background="?attr/selectableItemBackgroundBorderless" android:tint="#FFFFFF"/>
+              </LinearLayout>
+          </LinearLayout>
+          XML
+
+          cat > project/app/src/main/res/layout/activity_player.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:background="#0F0F0F" android:padding="16dp">
+              <ImageButton android:id="@+id/btn_back" android:layout_width="48dp" android:layout_height="48dp"
+                  android:src="@android:drawable/ic_menu_close_clear_cancel" android:background="?attr/selectableItemBackgroundBorderless" android:tint="#FFFFFF"/>
+              <ImageView android:id="@+id/iv_album_art" android:layout_width="280dp" android:layout_height="280dp"
+                  android:layout_gravity="center_horizontal" android:scaleType="centerCrop" android:background="#242424"/>
+              <TextView android:id="@+id/tv_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:textColor="#FFFFFF" android:textSize="20sp" android:textStyle="bold" android:gravity="center"
+                  android:maxLines="2" android:ellipsize="end" android:layout_marginTop="24dp"/>
+              <TextView android:id="@+id/tv_artist" android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:textColor="#1DB954" android:textSize="15sp" android:gravity="center" android:layout_marginTop="4dp"/>
+              <SeekBar android:id="@+id/seek_bar" android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:layout_marginTop="32dp" android:progressTint="#1DB954" android:thumbTint="#1DB954"/>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                  <TextView android:id="@+id/tv_current_time" android:layout_width="0dp" android:layout_height="wrap_content"
+                      android:layout_weight="1" android:text="0:00" android:textColor="#AAAAAA" android:textSize="12sp"/>
+                  <TextView android:id="@+id/tv_total_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:text="0:00" android:textColor="#AAAAAA" android:textSize="12sp"/>
+              </LinearLayout>
+              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                  android:gravity="center" android:layout_marginTop="24dp">
+                  <ImageButton android:id="@+id/btn_play_pause" android:layout_width="72dp" android:layout_height="72dp"
+                      android:src="@android:drawable/ic_media_pause" android:background="#1DB954" android:tint="#000000"/>
+              </LinearLayout>
+          </LinearLayout>
+          XML
+
+          cat > project/app/src/main/res/layout/item_song.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent" android:layout_height="72dp"
+              android:orientation="horizontal" android:gravity="center_vertical"
+              android:paddingLeft="16dp" android:paddingRight="16dp" android:background="?attr/selectableItemBackground">
+              <ImageView android:id="@+id/iv_thumb" android:layout_width="52dp" android:layout_height="52dp" android:scaleType="centerCrop"/>
+              <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                  android:orientation="vertical" android:paddingLeft="12dp" android:paddingRight="12dp">
+                  <TextView android:id="@+id/tv_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+                  <TextView android:id="@+id/tv_artist" android:layout_width="match_parent" android:layout_height="wrap_content"
+                      android:textColor="#AAAAAA" android:textSize="12sp" android:maxLines="1" android:ellipsize="end"/>
+              </LinearLayout>
+              <TextView android:id="@+id/tv_duration" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:textColor="#888888" android:textSize="11sp"/>
+          </LinearLayout>
+          XML
+
+      - name: Write resources
+        run: |
+          cat > project/app/src/main/res/values/colors.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="colorPrimary">#1DB954</color>
+              <color name="colorPrimaryDark">#158a3e</color>
+              <color name="colorAccent">#1DB954</color>
+          </resources>
+          XML
+
+          cat > project/app/src/main/res/values/strings.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><string name="app_name">Vibe Music</string></resources>
+          XML
+
+          cat > project/app/src/main/res/values/themes.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+                  <item name="colorPrimary">@color/colorPrimary</item>
+                  <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+                  <item name="colorAccent">@color/colorAccent</item>
+                  <item name="android:windowBackground">#0F0F0F</item>
+                  <item name="android:statusBarColor">#0F0F0F</item>
+              </style>
+          </resources>
+          XML
 
       - name: Build APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: project
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: VibeMusic-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
