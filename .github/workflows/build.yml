@@ -38,6 +38,10 @@ jobs:
           cp ic_launcher.xml app/src/main/res/drawable/
           cp gradle-wrapper.properties gradle/wrapper/
           cp build.gradle app/build.gradle
+      - name: Download Gradle Wrapper JAR
+        run: |
+          curl -L "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar
       - name: Make gradlew executable
         run: chmod +x gradlew
       - name: Build APK
