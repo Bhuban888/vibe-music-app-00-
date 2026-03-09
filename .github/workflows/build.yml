@@ -13,13 +13,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - uses: android-actions/setup-android@v3
-      - name: Arrange files
+      - name: Setup project structure
         run: |
           mkdir -p app/src/main/java/com/vibemusic
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p gradle/wrapper
+
           cp AndroidManifest.xml app/src/main/AndroidManifest.xml
           cp MainActivity.java app/src/main/java/com/vibemusic/
           cp PlayerActivity.java app/src/main/java/com/vibemusic/
@@ -38,14 +39,45 @@ jobs:
           cp ic_launcher.xml app/src/main/res/drawable/
           cp gradle-wrapper.properties gradle/wrapper/
           cp build.gradle app/build.gradle
+
+          # Fix root build.gradle
+          cat > build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application' version '8.3.0' apply false
+          }
+          EOF
+
+          # Fix settings.gradle
+          cat > settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "VibeMusic"
+          include ':app'
+          EOF
+
       - name: Download Gradle Wrapper JAR
         run: |
           curl -L "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
             -o gradle/wrapper/gradle-wrapper.jar
+
       - name: Make gradlew executable
         run: chmod +x gradlew
+
       - name: Build APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
