@@ -5,30 +5,21 @@
     android:orientation="vertical"
     android:background="#0F0F0F">
 
-    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎵 Vibe Music"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:padding="20dp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🎵 Vibe Music"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- Search Bar -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
         android:paddingBottom="12dp"
         android:gravity="center_vertical">
 
@@ -38,10 +29,10 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:hint="Search songs, artists..."
-            android:hintTextColor="#888888"
             android:textColor="#FFFFFF"
             android:background="@drawable/search_bg"
-            android:paddingHorizontal="16dp"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
             android:imeOptions="actionSearch"
             android:inputType="text"
             android:singleLine="true"
@@ -51,7 +42,7 @@
             android:id="@+id/btn_search"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginLeft="8dp"
             android:text="Search"
             android:textColor="#000000"
             android:backgroundTint="#1DB954"
@@ -74,19 +65,14 @@
         android:textColor="#888888"
         android:textSize="15sp"
         android:gravity="center"
-        android:padding="32dp"
-        android:visibility="visible" />
+        android:padding="32dp" />
 
-    <!-- Song List -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_songs"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingBottom="8dp" />
+        android:layout_weight="1" />
 
-    <!-- Mini Player -->
     <LinearLayout
         android:id="@+id/mini_player"
         android:layout_width="match_parent"
@@ -94,7 +80,8 @@
         android:orientation="horizontal"
         android:background="#1A1A1A"
         android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
         android:visibility="gone">
 
         <ImageView
@@ -108,7 +95,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingHorizontal="12dp">
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp">
 
             <TextView
                 android:id="@+id/tv_mini_title"
@@ -131,21 +119,4 @@
 
             <ProgressBar
                 android:id="@+id/progress_mini"
-                style="@style/Widget.AppCompat.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:layout_marginTop="4dp"
-                android:progressTint="#1DB954"
-                android:max="100" />
-        </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/btn_mini_play_pause"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@android:drawable/ic_media_play"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="#FFFFFF" />
-    </LinearLayout>
-
-</LinearLayout>
+                style="@style/Widget.AppCompat.ProgressBar.
