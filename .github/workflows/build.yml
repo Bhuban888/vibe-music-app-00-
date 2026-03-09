@@ -795,13 +795,9 @@ jobs:
           zipStorePath=wrapper/dists
           ENDOFFILE
 
-          curl -sL "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar
-
-          cat > gradlew << 'ENDOFFILE'
-          #!/bin/sh
-          exec java -jar gradle/wrapper/gradle-wrapper.jar "$@"
-          ENDOFFILE
+          wget -q https://services.gradle.org/distributions/gradle-8.6-bin.zip -P /tmp
+          unzip -q /tmp/gradle-8.6-bin.zip -d /tmp/gradle-dist
+          /tmp/gradle-dist/gradle-8.6/bin/gradle wrapper --gradle-version=8.6 --project-dir .
           chmod +x gradlew
 
       - name: Build Debug APK
